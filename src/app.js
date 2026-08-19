@@ -1,11 +1,12 @@
 import express from "express";
+import healthRouter from "./routes/health.routes.js";
 import recommendationsRouter from "./routes/recommendations.routes.js";
+import titlesRouter from "./routes/titles.routes.js";
 
 export function createApp() {
   const app = express();
 
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "10kb" }));
 
   app.use((request, response, next) => {
     response.setHeader("Access-Control-Allow-Origin", "*");
@@ -20,17 +21,22 @@ export function createApp() {
     next();
   });
 
+  app.use(express.json({ limit: "10kb" }));
+
   app.get("/", (_request, response) => {
     response.json({
       application: "CineMatch API",
-      documentation: "/api/health",
+      endpoints: {
+        health: "GET /api/health",
+        titles: "GET /api/titles",
+        titleById: "GET /api/titles/:id",
+        recommendations: "POST /api/recommendations",
+      },
     });
   });
 
-  app.get("/api/health", (_request, response) => {
-    response.json({ status: "ok", application: "CineMatch" });
-  });
-
+  app.use("/api/health", healthRouter);
+  app.use("/api/titles", titlesRouter);
   app.use("/api/recommendations", recommendationsRouter);
 
   app.use("/api", (_request, response) => {
@@ -38,6 +44,11 @@ export function createApp() {
   });
 
   app.use((error, _request, response, _next) => {
+    if (error instanceof SyntaxError && error.status === 400 && "body" in error) {
+      response.status(400).json({ error: "O corpo JSON da requisicao e invalido." });
+      return;
+    }
+
     console.error(error);
     response.status(500).json({ error: "Ocorreu um erro interno no servidor." });
   });

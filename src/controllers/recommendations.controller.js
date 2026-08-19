@@ -1,4 +1,3 @@
-import { getAllTitles } from "../repositories/titles.repository.js";
 import {
   InvalidPreferencesError,
   recommendTitles,
@@ -6,7 +5,7 @@ import {
 
 export function createRecommendations(request, response, next) {
   try {
-    const recommendations = recommendTitles(request.body, getAllTitles());
+    const recommendations = recommendTitles(request.body);
     response.json({ recommendations });
   } catch (error) {
     if (error instanceof InvalidPreferencesError) {
@@ -17,4 +16,3 @@ export function createRecommendations(request, response, next) {
     next(error);
   }
 }
-

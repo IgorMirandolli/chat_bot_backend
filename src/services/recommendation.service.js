@@ -1,3 +1,5 @@
+import { getAllTitles } from "../repositories/titles.repository.js";
+
 const VALID_TYPES = new Set(["movie", "series"]);
 
 export class InvalidPreferencesError extends Error {}
@@ -70,7 +72,11 @@ function scoreTitle(title, preferences) {
   };
 }
 
-export function recommendTitles(rawPreferences, titles, limit = 3) {
+export function recommendTitles(
+  rawPreferences,
+  titles = getAllTitles(),
+  limit = 3,
+) {
   const preferences = validatePreferences(rawPreferences);
 
   return titles
@@ -83,4 +89,3 @@ export function recommendTitles(rawPreferences, titles, limit = 3) {
     )
     .slice(0, limit);
 }
-
