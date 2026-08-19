@@ -9,14 +9,21 @@ function validatePreferences(preferences) {
     throw new InvalidPreferencesError("Informe as preferencias do usuario.");
   }
 
-  const { type, genre, mood, maxDuration } = preferences;
+  const { type, mood, maxDuration } = preferences;
+  const rawGenres = preferences.genres ?? preferences.genre;
 
   if (!VALID_TYPES.has(type)) {
     throw new InvalidPreferencesError("Escolha movie ou series como tipo.");
   }
 
-  if (typeof genre !== "string" || genre.trim() === "") {
-    throw new InvalidPreferencesError("Escolha um genero.");
+  const genres = typeof rawGenres === "string" ? [rawGenres] : rawGenres;
+
+  if (
+    !Array.isArray(genres) ||
+    genres.length === 0 ||
+    genres.some((genre) => typeof genre !== "string" || genre.trim() === "")
+  ) {
+    throw new InvalidPreferencesError("Escolha pelo menos um genero.");
   }
 
   if (typeof mood !== "string" || mood.trim() === "") {
@@ -31,7 +38,7 @@ function validatePreferences(preferences) {
 
   return {
     type,
-    genre: genre.trim(),
+    genres: [...new Set(genres.map((genre) => genre.trim()))],
     mood: mood.trim(),
     maxDuration: parsedDuration,
   };
@@ -40,10 +47,17 @@ function validatePreferences(preferences) {
 function scoreTitle(title, preferences) {
   let score = 0;
   const reasons = [];
+  const matchedGenres = preferences.genres.filter((genre) =>
+    title.genres.includes(genre),
+  );
 
-  if (title.genres.includes(preferences.genre)) {
-    score += 40;
-    reasons.push("Combina com o genero escolhido");
+  if (matchedGenres.length > 0) {
+    score += Math.round((matchedGenres.length / preferences.genres.length) * 40);
+    reasons.push(
+      matchedGenres.length === preferences.genres.length
+        ? "Combina com todos os generos escolhidos"
+        : `Combina com ${matchedGenres.length} de ${preferences.genres.length} generos escolhidos`,
+    );
   }
 
   if (title.moods.includes(preferences.mood)) {

@@ -1,13 +1,14 @@
 import { recommendTitles } from "./recommendation.service.js";
 
-const FIELDS = ["type", "genre", "mood", "maxDuration"];
+const FIELDS = ["type", "genres", "mood", "maxDuration"];
 
 const OPTIONS = {
   type: {
     movie: ["filme", "filmes", "longa", "longas", "movie"],
     series: ["serie", "series", "seriado", "seriados"],
   },
-  genre: {
+  genres: {
+    acao: ["acao", "acoes", "filme de acao", "serie de acao"],
     "ficcao-cientifica": [
       "ficcao cientifica",
       "ficcao",
@@ -37,6 +38,7 @@ const LABELS = {
     series: "S\u00e9rie",
   },
   genre: {
+    acao: "A\u00e7\u00e3o",
     "ficcao-cientifica": "Fic\u00e7\u00e3o cient\u00edfica",
     aventura: "Aventura",
     animacao: "Anima\u00e7\u00e3o",
@@ -60,7 +62,7 @@ const QUICK_REPLIES = {
     { label: "Filme", message: "Quero um filme" },
     { label: "S\u00e9rie", message: "Quero uma s\u00e9rie" },
   ],
-  genre: Object.entries(LABELS.genre).map(([value, label]) => ({
+  genres: Object.entries(LABELS.genre).map(([value, label]) => ({
     label,
     message: label,
     value,
@@ -80,7 +82,7 @@ const QUICK_REPLIES = {
 
 const QUESTIONS = {
   type: "Para come\u00e7ar, voc\u00ea prefere um filme ou uma s\u00e9rie?",
-  genre: "Qual g\u00eanero combina mais com voc\u00ea agora?",
+  genres: "Quais g\u00eaneros combinam com voc\u00ea agora? Pode escolher mais de um.",
   mood: "E qual clima voc\u00ea procura: algo divertido, emocionante, reflexivo, relaxante ou tenso?",
   maxDuration: "Quanto tempo voc\u00ea tem dispon\u00edvel para assistir?",
 };
@@ -97,12 +99,17 @@ const CHANGE_COMMANDS = {
     "trocar o formato",
     "outro formato",
   ],
-  genre: [
+  genres: [
     "mudar genero",
     "mudar o genero",
+    "mudar generos",
+    "mudar os generos",
     "trocar genero",
     "trocar o genero",
+    "trocar generos",
+    "trocar os generos",
     "outro genero",
+    "outros generos",
   ],
   mood: [
     "mudar clima",
@@ -131,9 +138,18 @@ const RESET_COMMANDS = [
   "limpar conversa",
 ];
 
+const CONFIRM_GENRES_COMMANDS = [
+  "continuar",
+  "continuar com esses generos",
+  "pronto",
+  "so esses",
+  "pode seguir",
+  "finalizar generos",
+];
+
 const POST_RECOMMENDATION_REPLIES = [
   { label: "Nova busca", message: "Quero come\u00e7ar de novo" },
-  { label: "Mudar g\u00eanero", message: "Quero mudar o g\u00eanero" },
+  { label: "Mudar g\u00eaneros", message: "Quero mudar os g\u00eaneros" },
   { label: "Mudar clima", message: "Quero mudar o clima" },
   { label: "Mudar tempo", message: "Quero mudar o tempo" },
 ];
@@ -170,6 +186,25 @@ function findLastOption(text, options) {
   });
 
   return selected;
+}
+
+function findAllOptions(text, options) {
+  const paddedText = ` ${text} `;
+
+  return Object.entries(options)
+    .map(([value, aliases]) => {
+      const indexes = aliases
+        .map((alias) => paddedText.indexOf(` ${alias} `))
+        .filter((index) => index >= 0);
+
+      return {
+        value,
+        index: indexes.length > 0 ? Math.min(...indexes) : -1,
+      };
+    })
+    .filter((match) => match.index >= 0)
+    .sort((first, second) => first.index - second.index)
+    .map((match) => match.value);
 }
 
 function extractDuration(text) {
@@ -213,12 +248,12 @@ function extractDuration(text) {
 function extractPreferences(text) {
   const preferences = {};
   const type = findLastOption(text, OPTIONS.type);
-  const genre = findLastOption(text, OPTIONS.genre);
+  const genres = findAllOptions(text, OPTIONS.genres);
   const mood = findLastOption(text, OPTIONS.mood);
   const maxDuration = extractDuration(text);
 
   if (type) preferences.type = type;
-  if (genre) preferences.genre = genre;
+  if (genres.length > 0) preferences.genres = genres;
   if (mood) preferences.mood = mood;
   if (maxDuration) preferences.maxDuration = maxDuration;
 
@@ -233,8 +268,14 @@ function sanitizeContext(rawContext) {
     preferences.type = rawPreferences.type;
   }
 
-  if (Object.hasOwn(OPTIONS.genre, rawPreferences.genre)) {
-    preferences.genre = rawPreferences.genre;
+  const rawGenres = rawPreferences.genres ?? rawPreferences.genre;
+  const genres = Array.isArray(rawGenres) ? rawGenres : [rawGenres];
+  const validGenres = genres.filter((genre) =>
+    Object.hasOwn(OPTIONS.genres, genre),
+  );
+
+  if (validGenres.length > 0) {
+    preferences.genres = [...new Set(validGenres)];
   }
 
   if (Object.hasOwn(OPTIONS.mood, rawPreferences.mood)) {
@@ -246,11 +287,18 @@ function sanitizeContext(rawContext) {
     preferences.maxDuration = duration;
   }
 
-  return { preferences };
+  return {
+    preferences,
+    genresConfirmed: rawContext?.genresConfirmed === true,
+  };
 }
 
-function getMissingField(preferences) {
-  return FIELDS.find((field) => preferences[field] === undefined);
+function getMissingField(preferences, genresConfirmed) {
+  if (!preferences.type) return "type";
+  if (!preferences.genres?.length || !genresConfirmed) return "genres";
+  if (!preferences.mood) return "mood";
+  if (!preferences.maxDuration) return "maxDuration";
+  return undefined;
 }
 
 function findChangeCommand(text) {
@@ -259,19 +307,49 @@ function findChangeCommand(text) {
   );
 }
 
-function getQuickReplies(field) {
-  return QUICK_REPLIES[field] || [];
+function getQuickReplies(field, preferences) {
+  if (field !== "genres") {
+    return QUICK_REPLIES[field] || [];
+  }
+
+  const selectedGenres = new Set(preferences.genres || []);
+  const replies = QUICK_REPLIES.genres.filter(
+    (reply) => !selectedGenres.has(reply.value),
+  );
+
+  if (selectedGenres.size > 0) {
+    replies.push({
+      label: "Continuar com esses",
+      message: "Continuar com esses generos",
+    });
+  }
+
+  return replies;
 }
 
-function buildContext(preferences, awaiting = null) {
-  return { preferences, awaiting };
+function buildContext(preferences, awaiting = null, genresConfirmed = true) {
+  return { preferences, awaiting, genresConfirmed };
 }
 
-function createQuestionResponse(reply, preferences, field) {
+function createQuestionResponse(reply, preferences, field, genresConfirmed = false) {
   return {
     reply: `${reply} ${QUESTIONS[field]}`.trim(),
-    context: buildContext(preferences, field),
-    quickReplies: getQuickReplies(field),
+    context: buildContext(preferences, field, genresConfirmed),
+    quickReplies: getQuickReplies(field, preferences),
+    recommendations: [],
+    complete: false,
+  };
+}
+
+function createGenreSelectionResponse(preferences) {
+  const selectedLabels = preferences.genres
+    .map((genre) => LABELS.genre[genre])
+    .join(" + ");
+
+  return {
+    reply: `Adicionei ${selectedLabels}. Voc\u00ea pode escolher outro g\u00eanero ou continuar.`,
+    context: buildContext(preferences, "genres", false),
+    quickReplies: getQuickReplies("genres", preferences),
     recommendations: [],
     complete: false,
   };
@@ -284,8 +362,11 @@ function describeRecognizedPreferences(recognized) {
     descriptions.push(recognized.type === "movie" ? "um filme" : "uma s\u00e9rie");
   }
 
-  if (recognized.genre) {
-    descriptions.push(`g\u00eanero ${LABELS.genre[recognized.genre].toLowerCase()}`);
+  if (recognized.genres) {
+    const genres = recognized.genres
+      .map((genre) => LABELS.genre[genre].toLowerCase())
+      .join(" + ");
+    descriptions.push(`g\u00eaneros ${genres}`);
   }
 
   if (recognized.mood) {
@@ -325,13 +406,16 @@ export async function processChatMessage(rawPayload, providedTitles) {
   }
 
   const text = normalizeText(rawPayload.message);
-  const { preferences } = sanitizeContext(rawPayload.context);
+  const sanitizedContext = sanitizeContext(rawPayload.context);
+  const { preferences } = sanitizedContext;
+  let { genresConfirmed } = sanitizedContext;
 
   if (RESET_COMMANDS.some((command) => containsPhrase(text, command))) {
     return createQuestionResponse(
       "Combinado, vamos fazer uma nova busca.",
       {},
       "type",
+      false,
     );
   }
 
@@ -340,24 +424,77 @@ export async function processChatMessage(rawPayload, providedTitles) {
       "Oi! Eu sou o Cine, seu assistente de filmes e s\u00e9ries. Voc\u00ea pode responder com suas palavras ou usar as sugest\u00f5es abaixo.",
       preferences,
       "type",
+      false,
     );
   }
 
   const changeField = findChangeCommand(text);
   if (changeField) {
     delete preferences[changeField];
+    if (changeField === "genres") {
+      genresConfirmed = false;
+    }
   }
 
   const recognized = extractPreferences(text);
-  Object.assign(preferences, recognized);
+  if (recognized.genres) {
+    preferences.genres = [
+      ...new Set([...(preferences.genres || []), ...recognized.genres]),
+    ];
+  }
+
+  Object.entries(recognized).forEach(([field, value]) => {
+    if (field !== "genres") {
+      preferences[field] = value;
+    }
+  });
+
+  const confirmsGenres = CONFIRM_GENRES_COMMANDS.some((command) =>
+    containsPhrase(text, command),
+  );
+
+  if (confirmsGenres && preferences.genres?.length) {
+    genresConfirmed = true;
+  }
+
+  const hasAllPreferences =
+    preferences.type &&
+    preferences.genres?.length &&
+    preferences.mood &&
+    preferences.maxDuration;
+
+  if (
+    recognized.genres &&
+    (hasAllPreferences || recognized.mood || recognized.maxDuration)
+  ) {
+    genresConfirmed = true;
+  }
 
   const missingField = changeField && recognized[changeField] === undefined
     ? changeField
-    : getMissingField(preferences);
+    : getMissingField(preferences, genresConfirmed);
 
   if (missingField) {
     if (changeField && recognized[changeField] === undefined) {
-      return createQuestionResponse("Claro, podemos alterar essa escolha.", preferences, missingField);
+      return createQuestionResponse(
+        "Claro, podemos alterar essa escolha.",
+        preferences,
+        missingField,
+        genresConfirmed,
+      );
+    }
+
+    if (missingField === "genres" && recognized.genres) {
+      return createGenreSelectionResponse(preferences);
+    }
+
+    if (confirmsGenres) {
+      return createQuestionResponse(
+        "Perfeito, vamos continuar.",
+        preferences,
+        missingField,
+        genresConfirmed,
+      );
     }
 
     const recognizedDescription = describeRecognizedPreferences(recognized);
@@ -366,17 +503,24 @@ export async function processChatMessage(rawPayload, providedTitles) {
         `Entendi: ${recognizedDescription}.`,
         preferences,
         missingField,
+        genresConfirmed,
       );
     }
 
     if (isGreeting(text)) {
-      return createQuestionResponse("Oi! Que bom ter voc\u00ea por aqui.", preferences, missingField);
+      return createQuestionResponse(
+        "Oi! Que bom ter voc\u00ea por aqui.",
+        preferences,
+        missingField,
+        genresConfirmed,
+      );
     }
 
     return createQuestionResponse(
       "N\u00e3o consegui identificar essa prefer\u00eancia ainda. Tente responder de outra forma ou escolha uma sugest\u00e3o.",
       preferences,
       missingField,
+      genresConfirmed,
     );
   }
 
@@ -387,7 +531,7 @@ export async function processChatMessage(rawPayload, providedTitles) {
 
     return {
       reply,
-      context: buildContext(preferences),
+      context: buildContext(preferences, null, true),
       quickReplies: POST_RECOMMENDATION_REPLIES,
       recommendations: [],
       complete: true,
@@ -401,7 +545,7 @@ export async function processChatMessage(rawPayload, providedTitles) {
 
   return {
     reply: "Perfeito! Cruzei suas prefer\u00eancias com o cat\u00e1logo e encontrei estas op\u00e7\u00f5es para voc\u00ea:",
-    context: buildContext(preferences),
+    context: buildContext(preferences, null, true),
     quickReplies: POST_RECOMMENDATION_REPLIES,
     recommendations,
     complete: true,

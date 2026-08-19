@@ -186,7 +186,7 @@ Exemplo:
 ```json
 {
   "type": "movie",
-  "genre": "ficcao-cientifica",
+  "genres": ["ficcao-cientifica", "drama"],
   "mood": "reflexivo",
   "maxDuration": 180
 }
@@ -202,7 +202,7 @@ Resposta `200`:
       "title": "A Chegada",
       "match": 100,
       "reasons": [
-        "Combina com o genero escolhido",
+        "Combina com todos os generos escolhidos",
         "Tem o clima que voce procura",
         "Cabe no seu tempo disponivel"
       ]
@@ -233,7 +233,7 @@ Primeira mensagem:
 
 ```json
 {
-  "message": "Quero um filme divertido de ate duas horas",
+  "message": "Quero um filme de acao e aventura de ate duas horas",
   "context": {}
 }
 ```
@@ -242,23 +242,25 @@ Resposta resumida:
 
 ```json
 {
-  "reply": "Entendi: um filme, clima divertido, ate 120 minutos. Qual genero combina mais com voce agora?",
+  "reply": "Entendi: um filme, generos acao + aventura, ate 120 minutos. E qual clima voce procura?",
   "context": {
     "preferences": {
       "type": "movie",
-      "mood": "divertido",
+      "genres": ["acao", "aventura"],
       "maxDuration": 120
     },
-    "awaiting": "genre"
+    "awaiting": "mood",
+    "genresConfirmed": true
   },
-  "quickReplies": [],
   "recommendations": [],
   "complete": false
 }
 ```
 
-O chat reconhece varias preferencias na mesma frase e comandos como `mudar o
-genero`, `mudar o clima` e `comecar de novo`.
+O chat reconhece varios generos na mesma frase e comandos como `mudar os
+generos`, `mudar o clima` e `comecar de novo`. O endpoint de recomendacoes ainda
+aceita o campo antigo `genre`, mas novos clientes devem enviar `genres` como uma
+lista.
 
 ## Arquitetura
 

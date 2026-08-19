@@ -10,7 +10,7 @@ const sampleTitles = [
     id: "perfect-match",
     title: "Combinacao perfeita",
     type: "movie",
-    genres: ["aventura"],
+    genres: ["acao", "aventura"],
     moods: ["emocionante"],
     durationMinutes: 90,
     releaseYear: 2020,
@@ -68,6 +68,22 @@ describe("recommendTitles", () => {
 
     assert.equal(recommendations.length, 1);
     assert.equal(recommendations[0].type, "series");
+  });
+
+  it("pontua proporcionalmente mais de um genero", async () => {
+    const recommendations = await recommendTitles(
+      {
+        type: "movie",
+        genres: ["acao", "aventura"],
+        mood: "emocionante",
+        maxDuration: 120,
+      },
+      sampleTitles,
+    );
+
+    assert.equal(recommendations[0].id, "perfect-match");
+    assert.equal(recommendations[0].match, 100);
+    assert.match(recommendations[0].reasons[0], /todos os generos/i);
   });
 
   it("rejeita preferencias incompletas", async () => {

@@ -106,7 +106,7 @@ describe("CineMatch API", () => {
 
     assert.equal(firstResponse.status, 200);
     assert.equal(firstBody.context.preferences.type, "series");
-    assert.equal(firstBody.context.preferences.genre, "misterio");
+    assert.deepEqual(firstBody.context.preferences.genres, ["misterio"]);
     assert.equal(firstBody.context.preferences.mood, "tenso");
     assert.equal(firstBody.context.awaiting, "maxDuration");
 
@@ -124,6 +124,24 @@ describe("CineMatch API", () => {
     assert.equal(secondBody.complete, true);
     assert.equal(secondBody.recommendations.length, 3);
     assert.equal(secondBody.recommendations[0].title, "Dark");
+  });
+
+  it("reconhece e combina mais de um genero no chat", async () => {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Quero um filme de acao e aventura emocionante de ate duas horas",
+        context: {},
+      }),
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.context.preferences.genres, ["acao", "aventura"]);
+    assert.equal(body.complete, true);
+    assert.equal(body.recommendations[0].title, "Homem-Aranha no Aranhaverso");
+    assert.equal(body.recommendations[0].match, 100);
   });
 
   it("responde 400 quando as preferencias sao invalidas", async () => {

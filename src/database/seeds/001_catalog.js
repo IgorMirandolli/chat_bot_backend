@@ -39,7 +39,7 @@ const titles = [
     slug: "homem-aranha-aranhaverso",
     title: "Homem-Aranha no Aranhaverso",
     type: "movie",
-    genres: ["animacao", "aventura"],
+    genres: ["acao", "animacao", "aventura"],
     moods: ["divertido", "emocionante"],
     durationMinutes: 117,
     releaseYear: 2018,
@@ -87,7 +87,7 @@ const titles = [
     slug: "stranger-things",
     title: "Stranger Things",
     type: "series",
-    genres: ["ficcao-cientifica", "aventura"],
+    genres: ["acao", "ficcao-cientifica", "aventura"],
     moods: ["tenso", "emocionante"],
     durationMinutes: 50,
     releaseYear: 2016,
@@ -123,7 +123,7 @@ const titles = [
     slug: "arcane",
     title: "Arcane",
     type: "series",
-    genres: ["animacao", "fantasia"],
+    genres: ["acao", "animacao", "fantasia"],
     moods: ["emocionante", "tenso"],
     durationMinutes: 42,
     releaseYear: 2021,
@@ -146,6 +146,7 @@ const titles = [
 ];
 
 const genreNames = {
+  acao: "Acao",
   animacao: "Animacao",
   aventura: "Aventura",
   comedia: "Comedia",
