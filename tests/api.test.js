@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { createApp } from "../src/app.js";
+import { destroyDatabaseConnection } from "../src/database/connection.js";
 
 let server;
 let baseUrl;
@@ -25,6 +26,8 @@ after(async () => {
       resolve();
     });
   });
+
+  await destroyDatabaseConnection();
 });
 
 describe("CineMatch API", () => {
@@ -88,6 +91,39 @@ describe("CineMatch API", () => {
     assert.equal(body.recommendations.length, 3);
     assert.equal(body.recommendations[0].title, "A Chegada");
     assert.equal(body.recommendations[0].match, 100);
+  });
+
+  it("conversa e recomenda a partir de uma mensagem", async () => {
+    const firstResponse = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Quero uma serie de misterio com clima tenso",
+        context: {},
+      }),
+    });
+    const firstBody = await firstResponse.json();
+
+    assert.equal(firstResponse.status, 200);
+    assert.equal(firstBody.context.preferences.type, "series");
+    assert.equal(firstBody.context.preferences.genre, "misterio");
+    assert.equal(firstBody.context.preferences.mood, "tenso");
+    assert.equal(firstBody.context.awaiting, "maxDuration");
+
+    const secondResponse = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Tenho uma hora",
+        context: firstBody.context,
+      }),
+    });
+    const secondBody = await secondResponse.json();
+
+    assert.equal(secondResponse.status, 200);
+    assert.equal(secondBody.complete, true);
+    assert.equal(secondBody.recommendations.length, 3);
+    assert.equal(secondBody.recommendations[0].title, "Dark");
   });
 
   it("responde 400 quando as preferencias sao invalidas", async () => {

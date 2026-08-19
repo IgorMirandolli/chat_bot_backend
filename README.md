@@ -1,21 +1,44 @@
 # CineMatch Backend
 
-API Node.js do CineMatch. Lista o catalogo, consulta titulos e calcula as tres melhores recomendacoes a partir das preferencias do usuario.
+API Node.js do CineMatch. Conversa com o usuario, interpreta preferencias em
+linguagem natural e calcula as tres melhores recomendacoes do catalogo.
 
 ## Tecnologias
 
 - JavaScript com ES Modules
 - Node.js
 - Express
-- JSON como catalogo inicial
+- MySQL
+- Knex para migrations e queries
+- mysql2
 - Node Test Runner
 
 ## Como executar
 
-Requisito: Node.js 20 ou superior.
+Requisitos:
+
+- Node.js 20 ou superior.
+- MySQL em execucao.
+- Um usuario MySQL com permissao para criar o banco e as tabelas.
+
+Configure um arquivo `.env` usando as variaveis de `.env.example`:
+
+```env
+PORT=3000
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=sua_senha
+DB_NAME=cinematch
+```
+
+Instale as dependencias e prepare as tabelas:
 
 ```bash
 npm install
+npm run db:create
+npm run db:migrate
+npm run db:seed
 npm start
 ```
 
@@ -29,9 +52,64 @@ npm run dev
 
 ## Testes
 
+Testes unitarios, sem conexao com o banco:
+
 ```bash
 npm test
 ```
+
+Testes HTTP de integracao, depois de executar migrations e seed:
+
+```bash
+npm run test:integration
+```
+
+## Banco de dados
+
+Criar o banco configurado em `DB_NAME`:
+
+```bash
+npm run db:create
+```
+
+Verificar a conexao:
+
+```bash
+npm run db:check
+```
+
+Ver migrations executadas e pendentes:
+
+```bash
+npm run db:status
+```
+
+Executar migrations pendentes:
+
+```bash
+npm run db:migrate
+```
+
+Desfazer o ultimo grupo de migrations:
+
+```bash
+npm run db:rollback
+```
+
+Popular o catalogo inicial:
+
+```bash
+npm run db:seed
+```
+
+Tabelas criadas:
+
+- `titles`: dados principais, duracao, ano e classificacao indicativa.
+- `genres`: generos disponiveis.
+- `moods`: climas usados pela recomendacao.
+- `title_genres`: relacionamento entre titulos e generos.
+- `title_moods`: relacionamento entre titulos e climas.
+- `knex_migrations`: controle automatico das migrations executadas.
 
 ## Endpoints
 
@@ -141,37 +219,85 @@ Preferencias invalidas retornam `400` neste formato:
 }
 ```
 
+### Chat
+
+```http
+POST /api/chat
+Content-Type: application/json
+```
+
+O contexto retornado pela API deve ser enviado novamente na proxima mensagem.
+Assim, a conversa continua sem armazenar sessoes no servidor.
+
+Primeira mensagem:
+
+```json
+{
+  "message": "Quero um filme divertido de ate duas horas",
+  "context": {}
+}
+```
+
+Resposta resumida:
+
+```json
+{
+  "reply": "Entendi: um filme, clima divertido, ate 120 minutos. Qual genero combina mais com voce agora?",
+  "context": {
+    "preferences": {
+      "type": "movie",
+      "mood": "divertido",
+      "maxDuration": 120
+    },
+    "awaiting": "genre"
+  },
+  "quickReplies": [],
+  "recommendations": [],
+  "complete": false
+}
+```
+
+O chat reconhece varias preferencias na mesma frase e comandos como `mudar o
+genero`, `mudar o clima` e `comecar de novo`.
+
 ## Arquitetura
 
 Cada requisicao percorre as camadas abaixo:
 
 ```text
-Route -> Controller -> Service -> Repository -> catalogo JSON
+Route -> Controller -> Service -> Repository -> MySQL
 ```
 
 - `routes`: define o metodo HTTP e o endereco.
 - `controllers`: recebe a requisicao e monta a resposta HTTP.
 - `services`: aplica validacoes e regras de negocio.
-- `repositories`: acessa os dados do catalogo.
-- `data`: armazena os dados enquanto o banco nao e implementado.
+- `repositories`: executa queries no MySQL usando Knex.
+- `database/migrations`: versiona a estrutura das tabelas.
+- `database/seeds`: cadastra o catalogo inicial.
 
 ## Estrutura
 
 ```text
 src/
 |-- controllers/
+|   |-- chat.controller.js
 |   |-- health.controller.js
 |   |-- recommendations.controller.js
 |   `-- titles.controller.js
-|-- data/
-|   `-- titles.json
+|-- database/
+|   |-- migrations/
+|   |-- seeds/
+|   |-- check-connection.js
+|   `-- connection.js
 |-- repositories/
 |   `-- titles.repository.js
 |-- routes/
+|   |-- chat.routes.js
 |   |-- health.routes.js
 |   |-- recommendations.routes.js
 |   `-- titles.routes.js
 |-- services/
+|   |-- chat.service.js
 |   |-- recommendation.service.js
 |   `-- titles.service.js
 |-- app.js

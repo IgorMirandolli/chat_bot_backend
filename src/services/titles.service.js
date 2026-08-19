@@ -22,7 +22,7 @@ function normalizeOptionalFilter(value, fieldName) {
   return value.trim().toLowerCase();
 }
 
-export function findTitles(filters = {}) {
+export async function findTitles(filters = {}, providedTitles) {
   const type = normalizeOptionalFilter(filters.type, "type");
   const genre = normalizeOptionalFilter(filters.genre, "genre");
   const mood = normalizeOptionalFilter(filters.mood, "mood");
@@ -33,7 +33,9 @@ export function findTitles(filters = {}) {
     );
   }
 
-  return getAllTitles().filter((title) => {
+  const titles = providedTitles || (await getAllTitles());
+
+  return titles.filter((title) => {
     const matchesType = !type || title.type === type;
     const matchesGenre = !genre || title.genres.includes(genre);
     const matchesMood = !mood || title.moods.includes(mood);
@@ -42,8 +44,10 @@ export function findTitles(filters = {}) {
   });
 }
 
-export function findTitleById(id) {
-  const title = getTitleById(id);
+export async function findTitleById(id, providedTitles) {
+  const title = providedTitles
+    ? providedTitles.find((item) => item.id === id)
+    : await getTitleById(id);
 
   if (!title) {
     throw new TitleNotFoundError(`Titulo com id "${id}" nao encontrado.`);

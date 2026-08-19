@@ -5,9 +5,9 @@ import {
   TitleNotFoundError,
 } from "../services/titles.service.js";
 
-export function listTitles(request, response, next) {
+export async function listTitles(request, response, next) {
   try {
-    const titles = findTitles(request.query);
+    const titles = await findTitles(request.query);
 
     response.json({
       count: titles.length,
@@ -23,9 +23,9 @@ export function listTitles(request, response, next) {
   }
 }
 
-export function getTitle(request, response, next) {
+export async function getTitle(request, response, next) {
   try {
-    const title = findTitleById(request.params.id);
+    const title = await findTitleById(request.params.id);
     response.json({ title });
   } catch (error) {
     if (error instanceof TitleNotFoundError) {

@@ -3,9 +3,9 @@ import {
   recommendTitles,
 } from "../services/recommendation.service.js";
 
-export function createRecommendations(request, response, next) {
+export async function createRecommendations(request, response, next) {
   try {
-    const recommendations = recommendTitles(request.body);
+    const recommendations = await recommendTitles(request.body);
     response.json({ recommendations });
   } catch (error) {
     if (error instanceof InvalidPreferencesError) {

@@ -1,4 +1,5 @@
 import express from "express";
+import chatRouter from "./routes/chat.routes.js";
 import healthRouter from "./routes/health.routes.js";
 import recommendationsRouter from "./routes/recommendations.routes.js";
 import titlesRouter from "./routes/titles.routes.js";
@@ -31,11 +32,13 @@ export function createApp() {
         titles: "GET /api/titles",
         titleById: "GET /api/titles/:id",
         recommendations: "POST /api/recommendations",
+        chat: "POST /api/chat",
       },
     });
   });
 
   app.use("/api/health", healthRouter);
+  app.use("/api/chat", chatRouter);
   app.use("/api/titles", titlesRouter);
   app.use("/api/recommendations", recommendationsRouter);
 

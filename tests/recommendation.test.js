@@ -39,8 +39,8 @@ const sampleTitles = [
 ];
 
 describe("recommendTitles", () => {
-  it("ordena os titulos pela compatibilidade", () => {
-    const recommendations = recommendTitles(
+  it("ordena os titulos pela compatibilidade", async () => {
+    const recommendations = await recommendTitles(
       {
         type: "movie",
         genre: "aventura",
@@ -55,8 +55,8 @@ describe("recommendTitles", () => {
     assert.equal(recommendations[1].id, "partial-match");
   });
 
-  it("retorna apenas o tipo solicitado", () => {
-    const recommendations = recommendTitles(
+  it("retorna apenas o tipo solicitado", async () => {
+    const recommendations = await recommendTitles(
       {
         type: "series",
         genre: "aventura",
@@ -70,11 +70,10 @@ describe("recommendTitles", () => {
     assert.equal(recommendations[0].type, "series");
   });
 
-  it("rejeita preferencias incompletas", () => {
-    assert.throws(
-      () => recommendTitles({ type: "movie" }, sampleTitles),
+  it("rejeita preferencias incompletas", async () => {
+    await assert.rejects(
+      recommendTitles({ type: "movie" }, sampleTitles),
       InvalidPreferencesError,
     );
   });
 });
-

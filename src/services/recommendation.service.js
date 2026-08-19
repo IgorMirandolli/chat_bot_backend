@@ -72,12 +72,13 @@ function scoreTitle(title, preferences) {
   };
 }
 
-export function recommendTitles(
+export async function recommendTitles(
   rawPreferences,
-  titles = getAllTitles(),
+  providedTitles,
   limit = 3,
 ) {
   const preferences = validatePreferences(rawPreferences);
+  const titles = providedTitles || (await getAllTitles());
 
   return titles
     .filter((title) => title.type === preferences.type)
