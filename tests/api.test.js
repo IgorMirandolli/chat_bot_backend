@@ -107,7 +107,7 @@ describe("CineMatch API", () => {
     assert.equal(firstResponse.status, 200);
     assert.equal(firstBody.context.preferences.type, "series");
     assert.deepEqual(firstBody.context.preferences.genres, ["misterio"]);
-    assert.equal(firstBody.context.preferences.mood, "tenso");
+    assert.deepEqual(firstBody.context.preferences.moods, ["tenso"]);
     assert.equal(firstBody.context.awaiting, "maxDuration");
 
     const secondResponse = await fetch(`${baseUrl}/api/chat`, {
@@ -141,6 +141,27 @@ describe("CineMatch API", () => {
     assert.deepEqual(body.context.preferences.genres, ["acao", "aventura"]);
     assert.equal(body.complete, true);
     assert.equal(body.recommendations[0].title, "Homem-Aranha no Aranhaverso");
+    assert.equal(body.recommendations[0].match, 100);
+  });
+
+  it("reconhece e combina mais de um clima no chat", async () => {
+    const response = await fetch(`${baseUrl}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: "Quero um filme de animacao e fantasia divertido e relaxante de ate duas horas",
+        context: {},
+      }),
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(body.context.preferences.moods, [
+      "divertido",
+      "relaxante",
+    ]);
+    assert.equal(body.complete, true);
+    assert.equal(body.recommendations[0].title, "O Servico de Entregas da Kiki");
     assert.equal(body.recommendations[0].match, 100);
   });
 

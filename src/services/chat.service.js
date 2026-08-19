@@ -1,6 +1,6 @@
 import { recommendTitles } from "./recommendation.service.js";
 
-const FIELDS = ["type", "genres", "mood", "maxDuration"];
+const FIELDS = ["type", "genres", "moods", "maxDuration"];
 
 const OPTIONS = {
   type: {
@@ -23,7 +23,7 @@ const OPTIONS = {
     misterio: ["misterio", "investigacao"],
     suspense: ["suspense", "thriller"],
   },
-  mood: {
+  moods: {
     divertido: ["divertido", "divertida", "rir", "risada"],
     emocionante: ["emocionante", "emocao", "empolgante"],
     reflexivo: ["reflexivo", "reflexiva", "pensar", "profundo", "profunda"],
@@ -67,7 +67,7 @@ const QUICK_REPLIES = {
     message: label,
     value,
   })),
-  mood: Object.entries(LABELS.mood).map(([value, label]) => ({
+  moods: Object.entries(LABELS.mood).map(([value, label]) => ({
     label,
     message: label,
     value,
@@ -83,7 +83,7 @@ const QUICK_REPLIES = {
 const QUESTIONS = {
   type: "Para come\u00e7ar, voc\u00ea prefere um filme ou uma s\u00e9rie?",
   genres: "Quais g\u00eaneros combinam com voc\u00ea agora? Pode escolher mais de um.",
-  mood: "E qual clima voc\u00ea procura: algo divertido, emocionante, reflexivo, relaxante ou tenso?",
+  moods: "Quais climas voc\u00ea procura? Pode escolher mais de um.",
   maxDuration: "Quanto tempo voc\u00ea tem dispon\u00edvel para assistir?",
 };
 
@@ -111,12 +111,17 @@ const CHANGE_COMMANDS = {
     "outro genero",
     "outros generos",
   ],
-  mood: [
+  moods: [
     "mudar clima",
     "mudar o clima",
+    "mudar climas",
+    "mudar os climas",
     "trocar clima",
     "trocar o clima",
+    "trocar climas",
+    "trocar os climas",
     "outro clima",
+    "outros climas",
   ],
   maxDuration: [
     "mudar tempo",
@@ -138,19 +143,21 @@ const RESET_COMMANDS = [
   "limpar conversa",
 ];
 
-const CONFIRM_GENRES_COMMANDS = [
+const CONFIRM_SELECTION_COMMANDS = [
   "continuar",
   "continuar com esses generos",
   "pronto",
   "so esses",
   "pode seguir",
   "finalizar generos",
+  "continuar com esses climas",
+  "finalizar climas",
 ];
 
 const POST_RECOMMENDATION_REPLIES = [
   { label: "Nova busca", message: "Quero come\u00e7ar de novo" },
   { label: "Mudar g\u00eaneros", message: "Quero mudar os g\u00eaneros" },
-  { label: "Mudar clima", message: "Quero mudar o clima" },
+  { label: "Mudar climas", message: "Quero mudar os climas" },
   { label: "Mudar tempo", message: "Quero mudar o tempo" },
 ];
 
@@ -249,12 +256,12 @@ function extractPreferences(text) {
   const preferences = {};
   const type = findLastOption(text, OPTIONS.type);
   const genres = findAllOptions(text, OPTIONS.genres);
-  const mood = findLastOption(text, OPTIONS.mood);
+  const moods = findAllOptions(text, OPTIONS.moods);
   const maxDuration = extractDuration(text);
 
   if (type) preferences.type = type;
   if (genres.length > 0) preferences.genres = genres;
-  if (mood) preferences.mood = mood;
+  if (moods.length > 0) preferences.moods = moods;
   if (maxDuration) preferences.maxDuration = maxDuration;
 
   return preferences;
@@ -278,8 +285,14 @@ function sanitizeContext(rawContext) {
     preferences.genres = [...new Set(validGenres)];
   }
 
-  if (Object.hasOwn(OPTIONS.mood, rawPreferences.mood)) {
-    preferences.mood = rawPreferences.mood;
+  const rawMoods = rawPreferences.moods ?? rawPreferences.mood;
+  const moods = Array.isArray(rawMoods) ? rawMoods : [rawMoods];
+  const validMoods = moods.filter((mood) =>
+    Object.hasOwn(OPTIONS.moods, mood),
+  );
+
+  if (validMoods.length > 0) {
+    preferences.moods = [...new Set(validMoods)];
   }
 
   const duration = Number(rawPreferences.maxDuration);
@@ -289,14 +302,23 @@ function sanitizeContext(rawContext) {
 
   return {
     preferences,
-    genresConfirmed: rawContext?.genresConfirmed === true,
+    genresConfirmed:
+      rawContext?.genresConfirmed === true ||
+      (rawContext?.genresConfirmed !== false &&
+        validGenres.length > 0 &&
+        rawContext?.awaiting !== "genres"),
+    moodsConfirmed:
+      rawContext?.moodsConfirmed === true ||
+      (rawContext?.moodsConfirmed !== false &&
+        validMoods.length > 0 &&
+        rawContext?.awaiting !== "moods"),
   };
 }
 
-function getMissingField(preferences, genresConfirmed) {
+function getMissingField(preferences, genresConfirmed, moodsConfirmed) {
   if (!preferences.type) return "type";
   if (!preferences.genres?.length || !genresConfirmed) return "genres";
-  if (!preferences.mood) return "mood";
+  if (!preferences.moods?.length || !moodsConfirmed) return "moods";
   if (!preferences.maxDuration) return "maxDuration";
   return undefined;
 }
@@ -308,48 +330,83 @@ function findChangeCommand(text) {
 }
 
 function getQuickReplies(field, preferences) {
-  if (field !== "genres") {
+  if (field !== "genres" && field !== "moods") {
     return QUICK_REPLIES[field] || [];
   }
 
-  const selectedGenres = new Set(preferences.genres || []);
-  const replies = QUICK_REPLIES.genres.filter(
-    (reply) => !selectedGenres.has(reply.value),
+  const selectedValues = new Set(preferences[field] || []);
+  const replies = QUICK_REPLIES[field].filter(
+    (reply) => !selectedValues.has(reply.value),
   );
 
-  if (selectedGenres.size > 0) {
+  if (selectedValues.size > 0) {
     replies.push({
       label: "Continuar com esses",
-      message: "Continuar com esses generos",
+      message: field === "genres"
+        ? "Continuar com esses generos"
+        : "Continuar com esses climas",
     });
   }
 
   return replies;
 }
 
-function buildContext(preferences, awaiting = null, genresConfirmed = true) {
-  return { preferences, awaiting, genresConfirmed };
+function buildContext(
+  preferences,
+  awaiting = null,
+  genresConfirmed = true,
+  moodsConfirmed = true,
+) {
+  return {
+    preferences,
+    awaiting,
+    genresConfirmed,
+    moodsConfirmed,
+  };
 }
 
-function createQuestionResponse(reply, preferences, field, genresConfirmed = false) {
+function createQuestionResponse(
+  reply,
+  preferences,
+  field,
+  genresConfirmed = false,
+  moodsConfirmed = false,
+) {
   return {
     reply: `${reply} ${QUESTIONS[field]}`.trim(),
-    context: buildContext(preferences, field, genresConfirmed),
+    context: buildContext(
+      preferences,
+      field,
+      genresConfirmed,
+      moodsConfirmed,
+    ),
     quickReplies: getQuickReplies(field, preferences),
     recommendations: [],
     complete: false,
   };
 }
 
-function createGenreSelectionResponse(preferences) {
-  const selectedLabels = preferences.genres
-    .map((genre) => LABELS.genre[genre])
+function createMultiSelectionResponse(
+  preferences,
+  field,
+  genresConfirmed,
+  moodsConfirmed,
+) {
+  const labels = field === "genres" ? LABELS.genre : LABELS.mood;
+  const selectedLabels = preferences[field]
+    .map((value) => labels[value])
     .join(" + ");
+  const itemName = field === "genres" ? "g\u00eanero" : "clima";
 
   return {
-    reply: `Adicionei ${selectedLabels}. Voc\u00ea pode escolher outro g\u00eanero ou continuar.`,
-    context: buildContext(preferences, "genres", false),
-    quickReplies: getQuickReplies("genres", preferences),
+    reply: `Adicionei ${selectedLabels}. Voc\u00ea pode escolher outro ${itemName} ou continuar.`,
+    context: buildContext(
+      preferences,
+      field,
+      genresConfirmed,
+      moodsConfirmed,
+    ),
+    quickReplies: getQuickReplies(field, preferences),
     recommendations: [],
     complete: false,
   };
@@ -369,8 +426,11 @@ function describeRecognizedPreferences(recognized) {
     descriptions.push(`g\u00eaneros ${genres}`);
   }
 
-  if (recognized.mood) {
-    descriptions.push(`clima ${LABELS.mood[recognized.mood].toLowerCase()}`);
+  if (recognized.moods) {
+    const moods = recognized.moods
+      .map((mood) => LABELS.mood[mood].toLowerCase())
+      .join(" + ");
+    descriptions.push(`climas ${moods}`);
   }
 
   if (recognized.maxDuration) {
@@ -408,13 +468,14 @@ export async function processChatMessage(rawPayload, providedTitles) {
   const text = normalizeText(rawPayload.message);
   const sanitizedContext = sanitizeContext(rawPayload.context);
   const { preferences } = sanitizedContext;
-  let { genresConfirmed } = sanitizedContext;
+  let { genresConfirmed, moodsConfirmed } = sanitizedContext;
 
   if (RESET_COMMANDS.some((command) => containsPhrase(text, command))) {
     return createQuestionResponse(
       "Combinado, vamos fazer uma nova busca.",
       {},
       "type",
+      false,
       false,
     );
   }
@@ -425,6 +486,7 @@ export async function processChatMessage(rawPayload, providedTitles) {
       preferences,
       "type",
       false,
+      false,
     );
   }
 
@@ -433,6 +495,9 @@ export async function processChatMessage(rawPayload, providedTitles) {
     delete preferences[changeField];
     if (changeField === "genres") {
       genresConfirmed = false;
+    }
+    if (changeField === "moods") {
+      moodsConfirmed = false;
     }
   }
 
@@ -443,36 +508,56 @@ export async function processChatMessage(rawPayload, providedTitles) {
     ];
   }
 
+  if (recognized.moods) {
+    preferences.moods = [
+      ...new Set([...(preferences.moods || []), ...recognized.moods]),
+    ];
+  }
+
   Object.entries(recognized).forEach(([field, value]) => {
-    if (field !== "genres") {
+    if (field !== "genres" && field !== "moods") {
       preferences[field] = value;
     }
   });
 
-  const confirmsGenres = CONFIRM_GENRES_COMMANDS.some((command) =>
+  const confirmsSelection = CONFIRM_SELECTION_COMMANDS.some((command) =>
     containsPhrase(text, command),
   );
+  const awaitingField = rawPayload.context?.awaiting;
+  const confirmsGenres = confirmsSelection && awaitingField === "genres";
+  const confirmsMoods = confirmsSelection && awaitingField === "moods";
 
   if (confirmsGenres && preferences.genres?.length) {
     genresConfirmed = true;
   }
 
+  if (confirmsMoods && preferences.moods?.length) {
+    moodsConfirmed = true;
+  }
+
   const hasAllPreferences =
     preferences.type &&
     preferences.genres?.length &&
-    preferences.mood &&
+    preferences.moods?.length &&
     preferences.maxDuration;
 
   if (
     recognized.genres &&
-    (hasAllPreferences || recognized.mood || recognized.maxDuration)
+    (hasAllPreferences || recognized.moods || recognized.maxDuration)
   ) {
     genresConfirmed = true;
   }
 
+  if (
+    recognized.moods &&
+    (hasAllPreferences || recognized.genres || recognized.maxDuration)
+  ) {
+    moodsConfirmed = true;
+  }
+
   const missingField = changeField && recognized[changeField] === undefined
     ? changeField
-    : getMissingField(preferences, genresConfirmed);
+    : getMissingField(preferences, genresConfirmed, moodsConfirmed);
 
   if (missingField) {
     if (changeField && recognized[changeField] === undefined) {
@@ -481,19 +566,35 @@ export async function processChatMessage(rawPayload, providedTitles) {
         preferences,
         missingField,
         genresConfirmed,
+        moodsConfirmed,
       );
     }
 
     if (missingField === "genres" && recognized.genres) {
-      return createGenreSelectionResponse(preferences);
+      return createMultiSelectionResponse(
+        preferences,
+        "genres",
+        false,
+        moodsConfirmed,
+      );
     }
 
-    if (confirmsGenres) {
+    if (missingField === "moods" && recognized.moods) {
+      return createMultiSelectionResponse(
+        preferences,
+        "moods",
+        genresConfirmed,
+        false,
+      );
+    }
+
+    if (confirmsSelection) {
       return createQuestionResponse(
         "Perfeito, vamos continuar.",
         preferences,
         missingField,
         genresConfirmed,
+        moodsConfirmed,
       );
     }
 
@@ -504,6 +605,7 @@ export async function processChatMessage(rawPayload, providedTitles) {
         preferences,
         missingField,
         genresConfirmed,
+        moodsConfirmed,
       );
     }
 
@@ -513,6 +615,7 @@ export async function processChatMessage(rawPayload, providedTitles) {
         preferences,
         missingField,
         genresConfirmed,
+        moodsConfirmed,
       );
     }
 
@@ -521,17 +624,18 @@ export async function processChatMessage(rawPayload, providedTitles) {
       preferences,
       missingField,
       genresConfirmed,
+      moodsConfirmed,
     );
   }
 
   if (Object.keys(recognized).length === 0) {
     const reply = isThanks(text)
       ? "Fico feliz em ajudar! Se quiser, podemos ajustar a busca."
-      : "Posso refazer a recomenda\u00e7\u00e3o se voc\u00ea quiser mudar o g\u00eanero, o clima ou o tempo dispon\u00edvel.";
+      : "Posso refazer a recomenda\u00e7\u00e3o se voc\u00ea quiser mudar os g\u00eaneros, os climas ou o tempo dispon\u00edvel.";
 
     return {
       reply,
-      context: buildContext(preferences, null, true),
+      context: buildContext(preferences, null, true, true),
       quickReplies: POST_RECOMMENDATION_REPLIES,
       recommendations: [],
       complete: true,
@@ -545,7 +649,7 @@ export async function processChatMessage(rawPayload, providedTitles) {
 
   return {
     reply: "Perfeito! Cruzei suas prefer\u00eancias com o cat\u00e1logo e encontrei estas op\u00e7\u00f5es para voc\u00ea:",
-    context: buildContext(preferences, null, true),
+    context: buildContext(preferences, null, true, true),
     quickReplies: POST_RECOMMENDATION_REPLIES,
     recommendations,
     complete: true,

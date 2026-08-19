@@ -11,7 +11,7 @@ const sampleTitles = [
     title: "Acao e aventura",
     type: "movie",
     genres: ["acao", "aventura"],
-    moods: ["emocionante"],
+    moods: ["emocionante", "tenso"],
     durationMinutes: 110,
     releaseYear: 2025,
     synopsis: "Titulo com dois generos usado no teste do chat.",
@@ -59,7 +59,7 @@ describe("processChatMessage", () => {
 
     assert.deepEqual(result.context.preferences, {
       type: "movie",
-      mood: "divertido",
+      moods: ["divertido"],
       maxDuration: 120,
     });
     assert.equal(result.context.awaiting, "genres");
@@ -129,6 +129,64 @@ describe("processChatMessage", () => {
         /continuar com esses/i.test(reply.label),
       ),
     );
+
+    const confirmedResult = await processChatMessage(
+      {
+        message: "Continuar com os generos Acao e Aventura",
+        context: secondResult.context,
+      },
+      sampleTitles,
+    );
+
+    assert.equal(confirmedResult.context.awaiting, "moods");
+    assert.equal(confirmedResult.context.genresConfirmed, true);
+    assert.deepEqual(
+      confirmedResult.context.preferences.genres,
+      ["acao", "aventura"],
+    );
+  });
+
+  it("acumula climas escolhidos antes de continuar", async () => {
+    const firstResult = await processChatMessage(
+      {
+        message: "Emocionante",
+        context: {
+          preferences: {
+            type: "movie",
+            genres: ["acao", "aventura"],
+          },
+          awaiting: "moods",
+          genresConfirmed: true,
+          moodsConfirmed: false,
+        },
+      },
+      sampleTitles,
+    );
+
+    const secondResult = await processChatMessage(
+      {
+        message: "Tenso",
+        context: firstResult.context,
+      },
+      sampleTitles,
+    );
+
+    assert.deepEqual(secondResult.context.preferences.moods, [
+      "emocionante",
+      "tenso",
+    ]);
+    assert.equal(secondResult.context.awaiting, "moods");
+
+    const confirmedResult = await processChatMessage(
+      {
+        message: "Continuar com os climas Emocionante e Tenso",
+        context: secondResult.context,
+      },
+      sampleTitles,
+    );
+
+    assert.equal(confirmedResult.context.awaiting, "maxDuration");
+    assert.equal(confirmedResult.context.moodsConfirmed, true);
   });
 
   it("permite mudar uma preferencia depois do resultado", async () => {

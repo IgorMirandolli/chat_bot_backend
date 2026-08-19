@@ -11,7 +11,7 @@ const sampleTitles = [
     title: "Combinacao perfeita",
     type: "movie",
     genres: ["acao", "aventura"],
-    moods: ["emocionante"],
+    moods: ["emocionante", "tenso"],
     durationMinutes: 90,
     releaseYear: 2020,
     synopsis: "Titulo usado no teste.",
@@ -84,6 +84,22 @@ describe("recommendTitles", () => {
     assert.equal(recommendations[0].id, "perfect-match");
     assert.equal(recommendations[0].match, 100);
     assert.match(recommendations[0].reasons[0], /todos os generos/i);
+  });
+
+  it("pontua proporcionalmente mais de um clima", async () => {
+    const recommendations = await recommendTitles(
+      {
+        type: "movie",
+        genre: "aventura",
+        moods: ["emocionante", "tenso"],
+        maxDuration: 120,
+      },
+      sampleTitles,
+    );
+
+    assert.equal(recommendations[0].id, "perfect-match");
+    assert.equal(recommendations[0].match, 100);
+    assert.match(recommendations[0].reasons[1], /todos os climas/i);
   });
 
   it("rejeita preferencias incompletas", async () => {

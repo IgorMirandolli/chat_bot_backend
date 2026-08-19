@@ -187,7 +187,7 @@ Exemplo:
 {
   "type": "movie",
   "genres": ["ficcao-cientifica", "drama"],
-  "mood": "reflexivo",
+  "moods": ["tenso", "reflexivo"],
   "maxDuration": 180
 }
 ```
@@ -203,7 +203,7 @@ Resposta `200`:
       "match": 100,
       "reasons": [
         "Combina com todos os generos escolhidos",
-        "Tem o clima que voce procura",
+        "Tem todos os climas que voce procura",
         "Cabe no seu tempo disponivel"
       ]
     }
@@ -242,25 +242,26 @@ Resposta resumida:
 
 ```json
 {
-  "reply": "Entendi: um filme, generos acao + aventura, ate 120 minutos. E qual clima voce procura?",
+  "reply": "Entendi: um filme, generos acao + aventura, ate 120 minutos. Quais climas voce procura?",
   "context": {
     "preferences": {
       "type": "movie",
       "genres": ["acao", "aventura"],
       "maxDuration": 120
     },
-    "awaiting": "mood",
-    "genresConfirmed": true
+    "awaiting": "moods",
+    "genresConfirmed": true,
+    "moodsConfirmed": false
   },
   "recommendations": [],
   "complete": false
 }
 ```
 
-O chat reconhece varios generos na mesma frase e comandos como `mudar os
-generos`, `mudar o clima` e `comecar de novo`. O endpoint de recomendacoes ainda
-aceita o campo antigo `genre`, mas novos clientes devem enviar `genres` como uma
-lista.
+O chat reconhece varios generos e climas na mesma frase, alem de comandos como
+`mudar os generos`, `mudar os climas` e `comecar de novo`. O endpoint de
+recomendacoes ainda aceita os campos antigos `genre` e `mood`, mas novos clientes
+devem enviar `genres` e `moods` como listas.
 
 ## Arquitetura
 

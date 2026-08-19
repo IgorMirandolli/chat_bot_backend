@@ -9,8 +9,9 @@ function validatePreferences(preferences) {
     throw new InvalidPreferencesError("Informe as preferencias do usuario.");
   }
 
-  const { type, mood, maxDuration } = preferences;
+  const { type, maxDuration } = preferences;
   const rawGenres = preferences.genres ?? preferences.genre;
+  const rawMoods = preferences.moods ?? preferences.mood;
 
   if (!VALID_TYPES.has(type)) {
     throw new InvalidPreferencesError("Escolha movie ou series como tipo.");
@@ -26,8 +27,14 @@ function validatePreferences(preferences) {
     throw new InvalidPreferencesError("Escolha pelo menos um genero.");
   }
 
-  if (typeof mood !== "string" || mood.trim() === "") {
-    throw new InvalidPreferencesError("Escolha um clima.");
+  const moods = typeof rawMoods === "string" ? [rawMoods] : rawMoods;
+
+  if (
+    !Array.isArray(moods) ||
+    moods.length === 0 ||
+    moods.some((mood) => typeof mood !== "string" || mood.trim() === "")
+  ) {
+    throw new InvalidPreferencesError("Escolha pelo menos um clima.");
   }
 
   const parsedDuration = Number(maxDuration);
@@ -39,7 +46,7 @@ function validatePreferences(preferences) {
   return {
     type,
     genres: [...new Set(genres.map((genre) => genre.trim()))],
-    mood: mood.trim(),
+    moods: [...new Set(moods.map((mood) => mood.trim()))],
     maxDuration: parsedDuration,
   };
 }
@@ -49,6 +56,9 @@ function scoreTitle(title, preferences) {
   const reasons = [];
   const matchedGenres = preferences.genres.filter((genre) =>
     title.genres.includes(genre),
+  );
+  const matchedMoods = preferences.moods.filter((mood) =>
+    title.moods.includes(mood),
   );
 
   if (matchedGenres.length > 0) {
@@ -60,9 +70,13 @@ function scoreTitle(title, preferences) {
     );
   }
 
-  if (title.moods.includes(preferences.mood)) {
-    score += 35;
-    reasons.push("Tem o clima que voce procura");
+  if (matchedMoods.length > 0) {
+    score += Math.round((matchedMoods.length / preferences.moods.length) * 35);
+    reasons.push(
+      matchedMoods.length === preferences.moods.length
+        ? "Tem todos os climas que voce procura"
+        : `Tem ${matchedMoods.length} de ${preferences.moods.length} climas escolhidos`,
+    );
   }
 
   if (title.durationMinutes <= preferences.maxDuration) {
