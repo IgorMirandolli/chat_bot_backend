@@ -1,4 +1,4 @@
-import { getAllTitles } from "../repositories/titles.repository.js";
+import { getRecommendationCatalog } from "./catalog.service.js";
 
 const VALID_TYPES = new Set(["movie", "series"]);
 
@@ -86,12 +86,16 @@ function scoreTitle(title, preferences) {
 
   return {
     id: title.id,
+    externalId: title.externalId,
+    source: title.source || "local",
     title: title.title,
     type: title.type,
     genres: title.genres,
     durationMinutes: title.durationMinutes,
     releaseYear: title.releaseYear,
     synopsis: title.synopsis,
+    posterUrl: title.posterUrl,
+    voteAverage: title.voteAverage,
     match: score,
     reasons:
       reasons.length > 0
@@ -106,7 +110,7 @@ export async function recommendTitles(
   limit = 3,
 ) {
   const preferences = validatePreferences(rawPreferences);
-  const titles = providedTitles || (await getAllTitles());
+  const titles = providedTitles || (await getRecommendationCatalog(preferences));
 
   return titles
     .filter((title) => title.type === preferences.type)

@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "node --test tests/chat.test.js tests/recommendation.test.js tests/titles.test.js",
+    "test": "node --test tests/catalog.test.js tests/chat.test.js tests/recommendation.test.js tests/titles.test.js tests/tmdb.test.js",
     "test:integration": "node --test tests/api.test.js",
     "db:create": "node src/database/create-database.js",
     "db:migrate": "knex --knexfile knexfile.cjs migrate:latest",

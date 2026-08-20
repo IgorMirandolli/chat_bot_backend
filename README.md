@@ -11,6 +11,7 @@ linguagem natural e calcula as tres melhores recomendacoes do catalogo.
 - MySQL
 - Knex para migrations e queries
 - mysql2
+- API do TMDB para ampliar o catalogo
 - Node Test Runner
 
 ## Como executar
@@ -30,7 +31,28 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=sua_senha
 DB_NAME=cinematch
+TMDB_ACCESS_TOKEN=seu_token_de_leitura
+TMDB_LANGUAGE=pt-BR
+TMDB_REGION=BR
+TMDB_CANDIDATE_LIMIT=12
+TMDB_CACHE_TTL_HOURS=6
 ```
+
+O `TMDB_ACCESS_TOKEN` e opcional. Sem ele, o projeto usa normalmente o catalogo
+local do MySQL. Com ele, o recomendador consulta filmes e series no TMDB, guarda
+o resultado no MySQL pelo tempo definido em `TMDB_CACHE_TTL_HOURS` e usa o
+catalogo local como fallback se a API externa falhar. Nunca envie o arquivo
+`.env` para o GitHub.
+
+Para ativar o catalogo externo:
+
+1. Crie uma conta no [TMDB](https://www.themoviedb.org/signup).
+2. Em `Settings -> API`, solicite uma chave para uso de desenvolvedor.
+3. Copie o `API Read Access Token` para `TMDB_ACCESS_TOKEN` no arquivo `.env`.
+4. Execute `npm run db:migrate` e reinicie o backend.
+
+A integracao usa o `fetch` nativo do Node.js 20, sem instalar um wrapper de
+terceiros para o TMDB.
 
 Instale as dependencias e prepare as tabelas:
 
@@ -109,6 +131,7 @@ Tabelas criadas:
 - `moods`: climas usados pela recomendacao.
 - `title_genres`: relacionamento entre titulos e generos.
 - `title_moods`: relacionamento entre titulos e climas.
+- `external_catalog_cache`: cache temporario das consultas feitas ao TMDB.
 - `knex_migrations`: controle automatico das migrations executadas.
 
 ## Endpoints
@@ -275,6 +298,8 @@ Route -> Controller -> Service -> Repository -> MySQL
 - `controllers`: recebe a requisicao e monta a resposta HTTP.
 - `services`: aplica validacoes e regras de negocio.
 - `repositories`: executa queries no MySQL usando Knex.
+- `services/tmdb.service.js`: consulta e normaliza dados externos do TMDB.
+- `services/catalog.service.js`: combina o TMDB com o catalogo local.
 - `database/migrations`: versiona a estrutura das tabelas.
 - `database/seeds`: cadastra o catalogo inicial.
 
@@ -293,6 +318,7 @@ src/
 |   |-- check-connection.js
 |   `-- connection.js
 |-- repositories/
+|   |-- catalog-cache.repository.js
 |   `-- titles.repository.js
 |-- routes/
 |   |-- chat.routes.js
@@ -300,8 +326,10 @@ src/
 |   |-- recommendations.routes.js
 |   `-- titles.routes.js
 |-- services/
+|   |-- catalog.service.js
 |   |-- chat.service.js
 |   |-- recommendation.service.js
+|   |-- tmdb.service.js
 |   `-- titles.service.js
 |-- app.js
 `-- server.js
